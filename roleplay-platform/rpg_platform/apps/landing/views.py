@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.forms import AuthenticationForm
 from rpg_platform.apps.accounts.forms import CustomUserCreationForm
 
@@ -7,6 +7,10 @@ def landing_page(request):
     """
     Landing page with registration and login forms
     """
+    # Redirect authenticated users to the dashboard
+    if request.user.is_authenticated:
+        return redirect('dashboard:home')
+
     login_form = AuthenticationForm()
     register_form = CustomUserCreationForm()
 

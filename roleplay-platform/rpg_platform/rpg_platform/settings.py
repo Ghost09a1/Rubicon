@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'rpg_platform.apps.moderation',
     'rpg_platform.apps.recommendations',
     'rpg_platform.apps.landing',  # Added landing app
+    'rpg_platform.apps.dashboard',  # Add the dashboard app
 
     # Third-party apps
     'channels',
