@@ -1,0 +1,89 @@
+// ... existing code ... <add near the end of the file, before closing body tag>
+
+<script>
+  // BBCode Spoiler Toggle
+  document.addEventListener('DOMContentLoaded', function() {
+    document.body.addEventListener('click', function(e) {
+      if (e.target.classList.contains('spoiler-toggle') || e.target.closest('.spoiler-toggle')) {
+        const spoilerToggle = e.target.classList.contains('spoiler-toggle') ?
+                             e.target :
+                             e.target.closest('.spoiler-toggle');
+        const spoilerContent = spoilerToggle.nextElementSibling;
+
+        if (spoilerContent.style.display === 'none') {
+          spoilerContent.style.display = 'block';
+          spoilerToggle.classList.add('active');
+        } else {
+          spoilerContent.style.display = 'none';
+          spoilerToggle.classList.remove('active');
+        }
+      }
+    });
+  });
+</script>
+
+<style>
+  /* BBCode Styles */
+  .spoiler {
+    margin: 1rem 0;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .spoiler-toggle {
+    padding: 0.75rem 1rem;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+
+  .spoiler-toggle:hover {
+    background-color: #e9ecef;
+  }
+
+  .spoiler-toggle.active {
+    background-color: #e9ecef;
+  }
+
+  .spoiler-toggle::before {
+    content: "▶";
+    display: inline-block;
+    margin-right: 0.5rem;
+    font-size: 0.75rem;
+    transition: transform 0.2s;
+  }
+
+  .spoiler-toggle.active::before {
+    transform: rotate(90deg);
+  }
+
+  .spoiler-content {
+    padding: 1rem;
+    background-color: #fff;
+  }
+
+  .bbcode-list {
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .bbcode-list li {
+    margin-bottom: 0.5rem;
+  }
+
+  /* Other BBCode styles */
+  .soundcloud-embed {
+    margin: 1rem 0;
+  }
+
+  .map-embed {
+    margin: 1rem 0;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+</style>
+
+// ... existing code ... <rest of the file>
