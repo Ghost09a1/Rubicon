@@ -76,13 +76,13 @@ class CharacterImageInline(admin.TabularInline):
 
 @admin.register(Character)
 class CharacterAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'gender', 'species', 'created_at', 'is_public')
-    list_filter = ('gender', 'is_public', 'created_at')
+    list_display = ('name', 'user', 'gender', 'species', 'created_at', 'public')
+    list_filter = ('gender', 'public', 'created_at')
     search_fields = ('name', 'user__username', 'species')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         (None, {
-            'fields': ('user', 'name', 'is_public')
+            'fields': ('user', 'name', 'public')
         }),
         (_('Basic Information'), {
             'fields': ('gender', 'species', 'height', 'body_type', 'age')
