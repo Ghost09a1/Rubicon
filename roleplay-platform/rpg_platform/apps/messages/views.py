@@ -740,3 +740,21 @@ def user_characters_api(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+
+class ChatMessageCreateView(LoginRequiredMixin, CreateView):
+    model = ChatMessage
+    form_class = ChatMessageForm
+    template_name = 'messages/chatmessage_form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.sender = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('messages:room_detail', kwargs={'pk': self.object.chat_room.pk})

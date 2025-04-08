@@ -200,3 +200,29 @@ class PrivateNoteForm(forms.ModelForm):
             # Make room optional
             self.fields['chat_room'].required = False
             self.fields['chat_room'].empty_label = _('Not associated with any chat')
+
+
+class ChatMessageForm(forms.ModelForm):
+    class Meta:
+        model = ChatMessage
+        fields = ['chat_room', 'receiver', 'character', 'message', 'message_type', 'delay_seconds', 'typing_duration_ms']
+        widgets = {
+            'message': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+            'chat_room': forms.Select(attrs={'class': 'form-control'}),
+            'receiver': forms.Select(attrs={'class': 'form-control'}),
+            'character': forms.Select(attrs={'class': 'form-control'}),
+            'message_type': forms.Select(attrs={'class': 'form-control'}),
+            'delay_seconds': forms.NumberInput(attrs={'class': 'form-control'}),
+            'typing_duration_ms': forms.NumberInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if self.user:
+            self.fields['chat_room'].queryset = ChatRoom.objects.filter(participants=self.user)
+            self.fields['receiver'].queryset = User.objects.exclude(pk=self.user.pk)
+            self.fields['character'].queryset = Character.objects.filter(user=self.user)
+            self.fields['character'].required = False
+
