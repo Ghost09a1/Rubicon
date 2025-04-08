@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
 from django.conf import settings
@@ -7,7 +7,15 @@ import os
 import json
 from datetime import date
 
-User = get_user_model()
+# Define custom User model that extends Django's AbstractUser
+class User(AbstractUser):
+    """
+    Custom user model for the roleplay platform
+    """
+    bio = models.TextField(_('Bio'), blank=True)
+
+    def __str__(self):
+        return self.username
 
 def avatar_upload_path(instance, filename):
     """Define upload path for user avatars"""

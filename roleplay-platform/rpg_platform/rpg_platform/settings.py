@@ -122,6 +122,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Custom user model
+AUTH_USER_MODEL = 'accounts.User'
+
 # Authentication
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'

@@ -98,6 +98,31 @@ The following form and view issues were fixed:
    - Fix: Ensured all migrations use the correct 'chat_messages' app label
    - Solution: Updated all scripts and fixed migration references
 
+## User Model Issues
+
+1. **AUTH_USER_MODEL Configuration**
+   - Issue: "AUTH_USER_MODEL refers to model 'accounts.User' that has not been installed"
+   - Fix: Added proper User model implementation in accounts app
+   - Solution: Added User class that extends Django's AbstractUser
+
+2. **Circular User Import**
+   - Issue: Circular dependency in accounts app from using get_user_model()
+   - Fix: Reorganized models to properly define the User model first
+   - Solution: Created fix_user_model.bat and fix_user_model.ps1 scripts
+
+3. **Missing User Migration**
+   - Issue: Migration missing for User model resulting in database inconsistency
+   - Fix: Created proper initial migration for User model
+   - Solution: Updated initial migrations to create User model before dependent models
+
+## How to Fix User Model Issues
+
+If you encounter User model errors (like "AUTH_USER_MODEL refers to model that has not been installed"), follow these steps:
+
+1. **Backup your database** - Always backup before attempting to fix User model issues
+2. **Run fix_user_model scripts** - Use the provided fix_user_model.bat (Windows) or fix_user_model.ps1 (PowerShell)
+3. **Note: This will reset your database** - The script will delete and recreate your database with the correct User model
+
 ## How to Fix Migration Conflicts
 
 If you encounter migration conflicts (like "Conflicting migrations detected" or "Could not find common ancestor"), follow these steps:
