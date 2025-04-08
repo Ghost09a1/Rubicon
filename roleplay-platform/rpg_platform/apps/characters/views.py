@@ -132,10 +132,10 @@ class CharacterDetailView(DetailView):
         context = super().get_context_data(**kwargs)
 
         # Add character info fields
-        context['info_categories'] = InfoCategory.objects.filter(is_required=True).prefetch_related(
+        context['info_categories'] = InfoCategory.objects.all().prefetch_related(
             Prefetch(
                 'fields',
-                queryset=InfoField.objects.filter(is_required=True),
+                queryset=InfoField.objects.filter(required=True),
                 to_attr='required_fields'
             )
         )

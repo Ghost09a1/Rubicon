@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
-from django.db import DatabaseError
+from django.db.utils import OperationalError, ProgrammingError
 import logging
 
 # Import models from other apps
@@ -23,63 +23,77 @@ def home(request):
     user = request.user
     context = {}
 
-    # Use defensive programming with try-except blocks for each section
-    # This prevents one failing query from bringing down the entire dashboard
-
-    # Character stats
+    # Character stats - with error handling
     try:
         context['character_count'] = Character.objects.filter(user=user).count()
         context['characters'] = Character.objects.filter(user=user).select_related('user').order_by('-updated_at')[:4]
-    except DatabaseError as e:
-        logger.error(f"Error fetching character data: {str(e)}")
+    except (OperationalError, ProgrammingError) as e:
+        logger.warning(f"Error retrieving character data: {str(e)}")
         context['character_count'] = 0
         context['characters'] = []
 
-    # Chat room stats
+    # Chat stats - with error handling
     try:
         context['chatroom_count'] = ChatRoom.objects.filter(participants=user).count()
         context['chat_rooms'] = ChatRoom.objects.filter(participants=user).prefetch_related('participants').order_by('-updated_at')[:5]
-    except DatabaseError as e:
-        logger.error(f"Error fetching chat room data: {str(e)}")
+    except (OperationalError, ProgrammingError) as e:
+        logger.warning(f"Error retrieving chat room data: {str(e)}")
         context['chatroom_count'] = 0
         context['chat_rooms'] = []
 
-    # Friend stats
+    # Friend stats - with error handling - Updated to use correct field names and remove status filter
     try:
-        context['friend_count'] = Friendship.objects.filter(Q(user1=user) | Q(user2=user)).count()
-        context['friend_requests'] = FriendRequest.objects.filter(to_user=user, status='pending').select_related('from_user', 'to_user')[:3]
-    except DatabaseError as e:
-        logger.error(f"Error fetching friendship data: {str(e)}")
+        # Get friendships where the user is either the 'user' or the 'friend'
+        context['friend_count'] = Friendship.objects.filter(
+            Q(user=user) | Q(friend=user)
+        ).count()
+
+        # Get friend requests - removed status field since it doesn't exist in the model
+        context['friend_requests'] = FriendRequest.objects.filter(
+            to_user=user
+        ).select_related('from_user', 'to_user')[:3]
+    except (OperationalError, ProgrammingError) as e:
+        logger.warning(f"Error retrieving friendship data: {str(e)}")
         context['friend_count'] = 0
         context['friend_requests'] = []
 
-    # Notification stats
+    # Notification stats - with error handling
     try:
         context['notification_count'] = Notification.objects.filter(user=user, read=False).count()
         context['notifications'] = Notification.objects.filter(user=user).select_related('actor', 'category').order_by('-created_at')[:5]
-    except DatabaseError as e:
-        logger.error(f"Error fetching notification data: {str(e)}")
+    except (OperationalError, ProgrammingError) as e:
+        logger.warning(f"Error retrieving notification data: {str(e)}")
         context['notification_count'] = 0
         context['notifications'] = []
 
-    # Activity stats
+    # Activity stats - with error handling - Updated to use correct field names
     try:
+        # Get friends IDs
+        friend_ids = Friendship.objects.filter(
+            Q(user=user)
+        ).values_list('friend', flat=True)
+
+        # Also include friendships where user is the 'friend'
+        friend_ids_reverse = Friendship.objects.filter(
+            Q(friend=user)
+        ).values_list('user', flat=True)
+
+        # Combine both sets of friend IDs
+        all_friend_ids = list(friend_ids) + list(friend_ids_reverse)
+
+        # Get activities from user and their friends
         context['activities'] = UserActivity.objects.filter(
-            # Show activities from the user and their friends
-            Q(user=user) |
-            Q(user__in=Friendship.objects.filter(Q(user1=user) | Q(user2=user)).values('user1', 'user2'))
+            Q(user=user) | Q(user__id__in=all_friend_ids)
         ).select_related('user').order_by('-created_at')[:8]
-    except DatabaseError as e:
-        logger.error(f"Error fetching activity data: {str(e)}")
+    except (OperationalError, ProgrammingError) as e:
+        logger.warning(f"Error retrieving activity data: {str(e)}")
         context['activities'] = []
 
-    # Recommendations
+    # Recommendations - with error handling
     try:
-        context['recommendations'] = CharacterRecommendation.objects.filter(
-            user=user, is_dismissed=False
-        ).select_related('character')[:3]
-    except DatabaseError as e:
-        logger.error(f"Error fetching recommendation data: {str(e)}")
+        context['recommendations'] = CharacterRecommendation.objects.filter(user=user, is_dismissed=False).select_related('character')[:3]
+    except (OperationalError, ProgrammingError) as e:
+        logger.warning(f"Error retrieving recommendation data: {str(e)}")
         context['recommendations'] = []
 
     return render(request, 'dashboard/home.html', context)

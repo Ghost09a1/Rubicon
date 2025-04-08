@@ -99,28 +99,39 @@ class ProfileDetailView(DetailView):
 
         # Check if the current user is friends with the profile user
         if user.is_authenticated:
-            context['is_friend'] = Friendship.objects.filter(
-                (Q(user1=user) & Q(user2=profile.user)) |
-                (Q(user1=profile.user) & Q(user2=user))
-            ).exists()
+            try:
+                context['is_friend'] = Friendship.objects.filter(
+                    (Q(user=user) & Q(friend=profile.user)) |
+                    (Q(user=profile.user) & Q(friend=user))
+                ).exists()
 
-            # Check for pending friend requests
-            context['outgoing_request'] = FriendRequest.objects.filter(
-                from_user=user, to_user=profile.user, status='pending'
-            ).exists()
+                # Check for pending friend requests
+                context['outgoing_request'] = FriendRequest.objects.filter(
+                    from_user=user, to_user=profile.user
+                ).exists()
 
-            context['incoming_request'] = FriendRequest.objects.filter(
-                from_user=profile.user, to_user=user, status='pending'
-            ).exists()
+                context['incoming_request'] = FriendRequest.objects.filter(
+                    from_user=profile.user, to_user=user
+                ).exists()
 
-            # Check if blocked
-            context['is_blocked'] = BlockedUser.objects.filter(
-                user=user, blocked_user=profile.user
-            ).exists()
+                # Check if blocked
+                context['is_blocked'] = BlockedUser.objects.filter(
+                    user=user, blocked_user=profile.user
+                ).exists()
 
-            context['is_blocking'] = BlockedUser.objects.filter(
-                user=profile.user, blocked_user=user
-            ).exists()
+                context['is_blocking'] = BlockedUser.objects.filter(
+                    user=profile.user, blocked_user=user
+                ).exists()
+            except Exception as e:
+                # Log error and provide fallback values
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error checking relationship status: {str(e)}")
+                context['is_friend'] = False
+                context['outgoing_request'] = False
+                context['incoming_request'] = False
+                context['is_blocked'] = False
+                context['is_blocking'] = False
 
         return context
 
@@ -285,21 +296,26 @@ class FriendListView(LoginRequiredMixin, ListView):
     context_object_name = 'friendships'
 
     def get_queryset(self):
-        return Friendship.objects.filter(
-            Q(user1=self.request.user) | Q(user2=self.request.user)
-        ).select_related('user1', 'user2')
+        try:
+            return Friendship.objects.filter(
+                Q(user=self.request.user) | Q(friend=self.request.user)
+            ).select_related('user', 'friend')
+        except Exception as e:
+            # Log error and provide fallback
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error retrieving friendships: {str(e)}")
+            return Friendship.objects.none()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
 
-        # Transform the friendships to a list of friend users
+        # Process the friendships to get a clean list of friend users
         friends = []
         for friendship in context['friendships']:
-            if friendship.user1 == user:
-                friends.append(friendship.user2)
-            else:
-                friends.append(friendship.user1)
+            friend_user = friendship.friend if friendship.user == user else friendship.user
+            friends.append(friend_user)
 
         context['friends'] = friends
         return context
@@ -339,10 +355,17 @@ class SendFriendRequestView(LoginRequiredMixin, RedirectView):
             return reverse('accounts:profile_detail', kwargs={'username': username})
 
         # Check if already friends
-        already_friends = Friendship.objects.filter(
-            (Q(user1=self.request.user) & Q(user2=to_user)) |
-            (Q(user1=to_user) & Q(user2=self.request.user))
-        ).exists()
+        try:
+            already_friends = Friendship.objects.filter(
+                (Q(user=self.request.user) & Q(friend=to_user)) |
+                (Q(user=to_user) & Q(friend=self.request.user))
+            ).exists()
+        except Exception as e:
+            # Log error and provide fallback
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error checking friendship status: {str(e)}")
+            already_friends = False
 
         if already_friends:
             messages.info(self.request, _("You are already friends with this user."))
@@ -504,11 +527,19 @@ class RemoveFriendView(LoginRequiredMixin, RedirectView):
         friend_id = self.kwargs.get('pk')
         friend = get_object_or_404(User, id=friend_id)
 
-        friendship = get_object_or_404(
-            Friendship,
-            (Q(user1=self.request.user) & Q(user2=friend)) |
-            (Q(user1=friend) & Q(user2=self.request.user))
-        )
+        try:
+            friendship = get_object_or_404(
+                Friendship,
+                (Q(user=self.request.user) & Q(friend=friend)) |
+                (Q(user=friend) & Q(friend=self.request.user))
+            )
+        except Exception as e:
+            # Log error and provide fallback
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error retrieving friendship: {str(e)}")
+            messages.error(self.request, _("An error occurred while removing this friend."))
+            return redirect('accounts:friend_list')
 
         friendship.delete()
         messages.info(self.request, _("You are no longer friends with {}.").format(friend.username))
