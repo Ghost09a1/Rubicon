@@ -77,7 +77,7 @@ try {
     python manage_windows.py migrate accounts
     python manage_windows.py migrate characters
     python manage_windows.py migrate moderation
-    python manage_windows.py migrate messages
+    python manage_windows.py migrate chat_messages
     python manage_windows.py migrate notifications
     python manage_windows.py migrate recommendations
     python manage_windows.py migrate dashboard

@@ -38,6 +38,7 @@ Write-Host " 5. Missing tables" -ForegroundColor White
 Write-Host " 6. Model field name inconsistencies" -ForegroundColor White
 Write-Host " 7. Missing model fields" -ForegroundColor White
 Write-Host " 8. Field reference inconsistencies" -ForegroundColor White
+Write-Host " 9. Migration conflicts" -ForegroundColor White
 Write-Host
 
 Write-Host "It's recommended to run this script when you encounter" -ForegroundColor Yellow
@@ -170,32 +171,127 @@ Execute-Step "STEP 3: Creating Fresh Migrations" {
 # Step 4: Fixing Messages App Configuration
 Execute-Step "STEP 4: Fixing Messages App Configuration" {
     $migrationsDir = "rpg_platform\apps\messages\migrations"
-    $fixPath = "$migrationsDir\fix_label.py"
+    $backupDir = "rpg_platform\apps\messages\migrations_backup"
+    $initialPath = "$migrationsDir\0001_initial.py"
 
-    Write-Host "Creating migrations fix script for Messages app..." -ForegroundColor Green
+    Write-Host "Cleaning up existing migrations in messages app..." -ForegroundColor Green
+
+    # Backup existing migrations if they exist
+    if (Test-Path $migrationsDir) {
+        Write-Host "Backing up existing migrations..." -ForegroundColor Green
+        if (-not (Test-Path $backupDir)) {
+            New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+        }
+
+        # Copy Python files to backup directory
+        Get-ChildItem -Path $migrationsDir -Filter "*.py" | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination $backupDir -Force
+        }
+
+        # Remove conflicting migrations
+        Get-ChildItem -Path $migrationsDir -Filter "0001_*.py" | Remove-Item -Force
+        Get-ChildItem -Path $migrationsDir -Filter "0002_*.py" | Remove-Item -Force
+        Get-ChildItem -Path $migrationsDir -Filter "fix_label.py" | Remove-Item -Force
+
+        Write-Host "Removed conflicting migrations." -ForegroundColor Green
+    }
 
     # Ensure migrations directory exists
     if (-not (Test-Path $migrationsDir)) {
         New-Item -ItemType Directory -Path $migrationsDir -Force | Out-Null
         Set-Content -Path "$migrationsDir\__init__.py" -Value ""
         Write-Host "Created migrations directory." -ForegroundColor Green
+    } else {
+        # Make sure __init__.py exists
+        Set-Content -Path "$migrationsDir\__init__.py" -Value ""
     }
 
-    # Create fix migration
-    $fixContent = @"
-from django.db import migrations
+    # Create consolidated initial migration
+    Write-Host "Creating consolidated initial migration for chat_messages app..." -ForegroundColor Green
+
+    $initialContent = @"
+from django.db import migrations, models
+import django.db.models.deletion
+
 
 class Migration(migrations.Migration):
-    dependencies = []
-    operations = []
+
+    initial = True
+
+    dependencies = [
+        ('characters', '0001_initial'),
+        ('accounts', '0001_initial'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='ChatRoom',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('name', models.CharField(blank=True, max_length=100, verbose_name='Room Name')),
+                ('room_type', models.CharField(choices=[('private', 'Private'), ('group', 'Group')], default='private', max_length=10, verbose_name='Room Type')),
+                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')),
+                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
+                ('is_active', models.BooleanField(default=True, verbose_name='Active')),
+                ('scene_description', models.TextField(blank=True, help_text='Setting and atmosphere for the current scene', verbose_name='Scene Description')),
+                ('scene_background_color', models.CharField(blank=True, default='', max_length=20, verbose_name='Scene Background Color')),
+                ('participants', models.ManyToManyField(related_name='chat_rooms', to='accounts.User', verbose_name='Participants')),
+            ],
+            options={
+                'verbose_name': 'Chat Room',
+                'verbose_name_plural': 'Chat Rooms',
+                'ordering': ['-updated_at'],
+            },
+        ),
+        migrations.CreateModel(
+            name='ChatMessage',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('message', models.TextField(verbose_name='Message')),
+                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')),
+                ('read', models.BooleanField(default=False, verbose_name='Read')),
+                ('character', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='chat_messages', to='characters.Character', verbose_name='Character')),
+                ('chat_room', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='chat_messages.ChatRoom', verbose_name='Chat Room')),
+                ('receiver', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='received_messages', to='accounts.User', verbose_name='Receiver')),
+                ('sender', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='sent_messages', to='accounts.User', verbose_name='Sender')),
+            ],
+        ),
+        migrations.CreateModel(
+            name='DiceRoll',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('formula', models.CharField(help_text='Format like "2d6+3" or "d20"', max_length=100, verbose_name='Dice Formula')),
+                ('result', models.JSONField(help_text='JSON containing the dice roll results', verbose_name='Result')),
+                ('total', models.IntegerField(verbose_name='Total Result')),
+                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')),
+                ('character', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='dice_rolls', to='characters.Character', verbose_name='Character')),
+                ('chat_room', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dice_rolls', to='chat_messages.ChatRoom', verbose_name='Chat Room')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dice_rolls', to='accounts.User', verbose_name='User')),
+            ],
+            options={
+                'verbose_name': 'Dice Roll',
+                'verbose_name_plural': 'Dice Rolls',
+                'ordering': ['-created_at'],
+            },
+        ),
+    ]
 "@
 
-    Set-Content -Path $fixPath -Value $fixContent
-    Write-Host "Created fix migration script." -ForegroundColor Green
+    Set-Content -Path $initialPath -Value $initialContent
+    Write-Host "Created consolidated initial migration." -ForegroundColor Green
 }
 
 # Step 5: Applying Migrations in Correct Order
 Execute-Step "STEP 5: Applying Migrations in Correct Order" {
+    # Clear any existing migration state for chat_messages
+    Write-Host "Clearing any existing migration state from chat_messages app..." -ForegroundColor Green
+    try {
+        python manage_windows.py migrate chat_messages zero --fake
+        Write-Host "Successfully cleared chat_messages migration state." -ForegroundColor Green
+    } catch {
+        Write-Host "Warning: Could not clear chat_messages migrations, but continuing..." -ForegroundColor Yellow
+    }
+
     # Apply basic system migrations first
     Write-Host "Applying basic system migrations first..." -ForegroundColor Green
     python manage_windows.py migrate auth
@@ -208,7 +304,14 @@ Execute-Step "STEP 5: Applying Migrations in Correct Order" {
     Write-Host "Applying app-specific migrations in dependency order..." -ForegroundColor Green
     python manage_windows.py migrate accounts
     python manage_windows.py migrate characters
-    python manage_windows.py migrate messages
+
+    Write-Host "Applying chat_messages migrations..." -ForegroundColor Green
+    python manage_windows.py migrate chat_messages
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Warning: Issues with chat_messages migration, trying with --fake-initial flag..." -ForegroundColor Yellow
+        python manage_windows.py migrate chat_messages --fake-initial
+    }
+
     python manage_windows.py migrate moderation
     python manage_windows.py migrate notifications
     python manage_windows.py migrate recommendations
@@ -276,19 +379,60 @@ Execute-Step "STEP 6: Fixing Model Field Inconsistencies" {
     Write-Host "Model field inconsistency fixes applied." -ForegroundColor Green
 }
 
-# Step 7: Performing Database Check
-Execute-Step "STEP 7: Performing Database Check" {
+# Step 7: Resolving Migration Conflicts
+Execute-Step "STEP 7: Resolving Migration Conflicts" {
+    Write-Host "Checking for migration conflicts..." -ForegroundColor Green
+
+    # Create a temporary file to store migration status
+    $tempFile = [System.IO.Path]::GetTempFileName()
+
+    # Run the command and redirect output to the temp file
+    python manage_windows.py showmigrations chat_messages > $tempFile
+
+    # Check if there are unapplied migrations
+    $unappliedMigrations = Select-String -Path $tempFile -Pattern "\[ \]" -Quiet
+
+    if ($unappliedMigrations) {
+        Write-Host "Migration conflicts detected. Resolving now..." -ForegroundColor Yellow
+
+        Write-Host "Step 1: Clearing migration history for chat_messages app..." -ForegroundColor Green
+        python manage_windows.py migrate chat_messages zero --fake
+
+        Write-Host "Step 2: Applying the consolidated migration..." -ForegroundColor Green
+        try {
+            python manage_windows.py migrate chat_messages
+            Write-Host "Successfully applied chat_messages migrations." -ForegroundColor Green
+        } catch {
+            Write-Host "Warning: There was an issue applying migrations, trying with --fake-initial flag..." -ForegroundColor Yellow
+            python manage_windows.py migrate chat_messages --fake-initial
+        }
+
+        Write-Host "Migration conflict resolution complete." -ForegroundColor Green
+    } else {
+        Write-Host "No migration conflicts detected for chat_messages app." -ForegroundColor Green
+    }
+
+    # Clean up the temporary file
+    Remove-Item -Path $tempFile -Force
+}
+
+# Step 8: Performing Database Check
+Execute-Step "STEP 8: Performing Database Check" {
     Write-Host "Checking database integrity..." -ForegroundColor Green
     try {
         python manage_windows.py check
-        Write-Host "Database integrity check passed." -ForegroundColor Green
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Database integrity check passed." -ForegroundColor Green
+        } else {
+            Write-Host "Warning: Database check found issues." -ForegroundColor Yellow
+        }
     } catch {
-        Write-Host "Warning: Database check found issues: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "Error during database check: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
 
-# Step 8: Superuser Account Creation
-Execute-Step "STEP 8: Superuser Account Creation" {
+# Step 9: Superuser Account Creation
+Execute-Step "STEP 9: Superuser Account Creation" {
     $createSuperuser = Read-Host "Would you like to create a superuser account? (y/n)"
     if ($createSuperuser.ToLower() -eq "y") {
         Write-Host "Creating superuser account with default credentials..." -ForegroundColor Green

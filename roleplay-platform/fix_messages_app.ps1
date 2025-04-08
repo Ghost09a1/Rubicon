@@ -67,8 +67,8 @@ try {
 Write-Host
 Write-Host "Step 5: Creating missing tables if needed..." -ForegroundColor Green
 try {
-    python -c "from django.core.management import call_command; call_command('makemigrations', 'messages', '--name', 'create_missing_tables')"
-    python manage_windows.py migrate messages
+    python -c "from django.core.management import call_command; call_command('makemigrations', 'chat_messages', '--name', 'create_missing_tables')"
+    python manage_windows.py migrate chat_messages
     Write-Host "Created and applied migrations for missing tables." -ForegroundColor Green
 } catch {
     Write-Host "Warning: Error creating tables: $($_.Exception.Message)" -ForegroundColor Yellow

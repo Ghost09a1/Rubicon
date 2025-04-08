@@ -14,6 +14,8 @@ echo  5. Missing tables
 echo  6. Model field name inconsistencies
 echo  7. Missing model fields
 echo  8. Field reference inconsistencies
+echo  9. Migration conflicts
+
 echo.
 echo It's recommended to run this script when you encounter
 echo any technical issues with the application.
@@ -128,23 +130,105 @@ echo    STEP 4: Fixing Messages App Configuration
 echo ===================================================
 echo.
 
-echo Creating migrations fix script for Messages app...
+echo Cleaning up existing migrations in messages app...
+if exist "rpg_platform\apps\messages\migrations" (
+    echo Backing up existing migrations...
+    if not exist "rpg_platform\apps\messages\migrations_backup" (
+        mkdir "rpg_platform\apps\messages\migrations_backup"
+    )
+    xcopy /Y "rpg_platform\apps\messages\migrations\*.py" "rpg_platform\apps\messages\migrations_backup\" > nul 2>&1
+
+    echo Removing conflicting migrations...
+    del /Q "rpg_platform\apps\messages\migrations\0001_*.py" > nul 2>&1
+    del /Q "rpg_platform\apps\messages\migrations\0002_*.py" > nul 2>&1
+    del /Q "rpg_platform\apps\messages\migrations\fix_label.py" > nul 2>&1
+)
+
+echo Creating migrations directory and __init__.py if needed...
 if not exist "rpg_platform\apps\messages\migrations" (
     mkdir "rpg_platform\apps\messages\migrations"
     echo. > "rpg_platform\apps\messages\migrations\__init__.py"
+) else (
+    echo. > "rpg_platform\apps\messages\migrations\__init__.py"
 )
 
-echo from django.db import migrations > "rpg_platform\apps\messages\migrations\fix_label.py"
-echo. >> "rpg_platform\apps\messages\migrations\fix_label.py"
-echo class Migration(migrations.Migration): >> "rpg_platform\apps\messages\migrations\fix_label.py"
-echo     dependencies = [] >> "rpg_platform\apps\messages\migrations\fix_label.py"
-echo     operations = [] >> "rpg_platform\apps\messages\migrations\fix_label.py"
+echo Creating consolidated initial migration for messages app...
+echo from django.db import migrations, models > "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo import django.db.models.deletion >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo. >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo. >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo class Migration(migrations.Migration): >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo. >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo     initial = True >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo. >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo     dependencies = [ >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo         ('characters', '0001_initial'), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo         ('accounts', '0001_initial'), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo     ] >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo. >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo     operations = [ >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo         migrations.CreateModel( >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             name='ChatRoom', >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             fields=[ >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('name', models.CharField(blank=True, max_length=100, verbose_name='Room Name')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('room_type', models.CharField(choices=[('private', 'Private'), ('group', 'Group')], default='private', max_length=10, verbose_name='Room Type')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('is_active', models.BooleanField(default=True, verbose_name='Active')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('scene_description', models.TextField(blank=True, help_text='Setting and atmosphere for the current scene', verbose_name='Scene Description')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('participants', models.ManyToManyField(related_name='chat_rooms', to='accounts.User', verbose_name='Participants')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             ], >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             options={ >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 'verbose_name': 'Chat Room', >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 'verbose_name_plural': 'Chat Rooms', >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 'ordering': ['-updated_at'], >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             }, >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo         ), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo         migrations.CreateModel( >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             name='ChatMessage', >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             fields=[ >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('message', models.TextField(verbose_name='Message')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('read', models.BooleanField(default=False, verbose_name='Read')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('character', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='chat_messages', to='characters.Character', verbose_name='Character')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('chat_room', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='chat_messages.ChatRoom', verbose_name='Chat Room')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('receiver', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='received_messages', to='accounts.User', verbose_name='Receiver')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('sender', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='sent_messages', to='accounts.User', verbose_name='Sender')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             ], >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo         ), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo         migrations.CreateModel( >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             name='DiceRoll', >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             fields=[ >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('formula', models.CharField(help_text='Format like \"2d6+3\" or \"d20\"', max_length=100, verbose_name='Dice Formula')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('result', models.JSONField(help_text='JSON containing the dice roll results', verbose_name='Result')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('total', models.IntegerField(verbose_name='Total Result')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('character', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='dice_rolls', to='characters.Character', verbose_name='Character')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('chat_room', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dice_rolls', to='chat_messages.ChatRoom', verbose_name='Chat Room')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dice_rolls', to='accounts.User', verbose_name='User')), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             ], >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             options={ >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 'verbose_name': 'Dice Roll', >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 'verbose_name_plural': 'Dice Rolls', >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo                 'ordering': ['-created_at'], >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo             }, >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo         ), >> "rpg_platform\apps\messages\migrations\0001_initial.py"
+echo     ] >> "rpg_platform\apps\messages\migrations\0001_initial.py"
 
 echo.
 echo ===================================================
 echo    STEP 5: Applying Migrations in Correct Order
 echo ===================================================
 echo.
+
+echo Clearing any existing migration state from chat_messages app...
+python manage_windows.py migrate chat_messages zero --fake
+if errorlevel 1 (
+    echo Warning: Could not clear chat_messages migrations, but continuing...
+)
 
 echo Applying basic system migrations first...
 python manage_windows.py migrate auth
@@ -156,7 +240,8 @@ echo.
 echo Applying app-specific migrations in dependency order...
 python manage_windows.py migrate accounts
 python manage_windows.py migrate characters
-python manage_windows.py migrate messages
+echo Applying chat_messages migrations...
+python manage_windows.py migrate chat_messages
 python manage_windows.py migrate moderation
 python manage_windows.py migrate notifications
 python manage_windows.py migrate recommendations
@@ -208,13 +293,42 @@ echo    - Fixed: Now correctly uses 'user/friend' fields in multiple friend view
 echo    - Error: "Cannot resolve keyword 'user1/user2' into field"
 echo.
 
+echo.
 echo Applying comprehensive error handling to all views...
 echo This ensures the application will gracefully handle database errors
 echo even if fields are missing or tables don't exist yet.
 
 echo.
 echo ===================================================
-echo    STEP 7: Performing Database Check
+echo    STEP 7: Resolving Migration Conflicts
+echo ===================================================
+echo.
+
+echo Checking for migration conflicts...
+python manage_windows.py showmigrations chat_messages > migration_status.txt
+findstr /C:"[ ]" migration_status.txt > nul
+if errorlevel 1 (
+    echo No migration conflicts detected for chat_messages app.
+) else (
+    echo Migration conflicts detected. Resolving now...
+
+    echo Step 1: Clearing migration history for chat_messages app...
+    python manage_windows.py migrate chat_messages zero --fake
+
+    echo Step 2: Applying the consolidated migration...
+    python manage_windows.py migrate chat_messages
+    if errorlevel 1 (
+        echo Warning: There was an issue applying migrations, trying with --fake-initial flag...
+        python manage_windows.py migrate chat_messages --fake-initial
+    )
+
+    echo Migration conflict resolution complete.
+)
+del migration_status.txt
+
+echo.
+echo ===================================================
+echo    STEP 8: Performing Database Check
 echo ===================================================
 echo.
 
@@ -228,7 +342,7 @@ if errorlevel 1 (
 
 echo.
 echo ===================================================
-echo    STEP 8: Superuser Account Creation
+echo    STEP 9: Superuser Account Creation
 echo ===================================================
 echo.
 

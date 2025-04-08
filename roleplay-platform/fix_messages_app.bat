@@ -28,8 +28,8 @@ if errorlevel 1 (
 )
 
 echo Step 5: Creating missing tables if needed...
-python -c "from django.core.management import call_command; call_command('makemigrations', 'messages', '--name', 'create_missing_tables')"
-python manage_windows.py migrate messages
+python -c "from django.core.management import call_command; call_command('makemigrations', 'chat_messages', '--name', 'create_missing_tables')"
+python manage_windows.py migrate chat_messages
 
 echo.
 echo === Configuration Fix Complete ===
