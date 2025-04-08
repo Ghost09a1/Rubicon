@@ -462,7 +462,7 @@
             <div class="feature-content">
               <h3>{% trans "Chat Rooms" %}</h3>
               <p>{% trans "Join immersive chat rooms to roleplay with others or create your own private role-playing scenes." %}</p>
-              <a href="{% url 'messages:chatroom_list' %}" class="feature-link">{% trans "Chat Now" %}</a>
+              <a href="{% url 'messages:room_list' %}" class="feature-link">{% trans "Chat Now" %}</a>
             </div>
           </div>
 
@@ -506,7 +506,7 @@
             <div class="feature-content">
               <h3>{% trans "Notifications" %}</h3>
               <p>{% trans "Stay updated on messages, comments, friend requests, and other important activities." %}</p>
-              <a href="{% url 'notifications:list' %}" class="feature-link">{% trans "View All" %}</a>
+              <a href="{% url 'notifications:notification_list' %}" class="feature-link">{% trans "View All" %}</a>
             </div>
           </div>
         </div>
@@ -553,7 +553,7 @@
       <div class="feature-section notifications-section">
         <div class="section-header">
           <h2>{% trans "Notifications" %}</h2>
-          <a href="{% url 'notifications:list' %}">{% trans "View All" %}</a>
+          <a href="{% url 'notifications:notification_list' %}">{% trans "View All" %}</a>
         </div>
 
         <div class="notifications-list">
@@ -587,7 +587,7 @@
         </div>
 
         {% if notifications %}
-          <a href="{% url 'notifications:list' %}" class="btn-view-all mt-3">{% trans "View All Notifications" %}</a>
+          <a href="{% url 'notifications:notification_list' %}" class="btn-view-all mt-3">{% trans "View All Notifications" %}</a>
         {% endif %}
       </div>
 
@@ -665,13 +665,13 @@
       <div class="feature-section">
         <div class="section-header">
           <h2>{% trans "Active Chats" %}</h2>
-          <a href="{% url 'messages:chatroom_list' %}">{% trans "View All" %}</a>
+          <a href="{% url 'messages:room_list' %}">{% trans "View All" %}</a>
         </div>
 
         <div class="chatroom-list">
           {% if chat_rooms %}
             {% for room in chat_rooms %}
-              <a href="{% url 'messages:chatroom_detail' room.id %}" class="text-decoration-none">
+              <a href="{% url 'messages:room_detail' room.id %}" class="text-decoration-none">
                 <div class="activity-item">
                   <div class="activity-avatar">
                     {% if room.name %}
@@ -709,9 +709,9 @@
         </div>
 
         {% if chat_rooms %}
-          <a href="{% url 'messages:chatroom_list' %}" class="btn-view-all mt-3">{% trans "View All Chats" %}</a>
+          <a href="{% url 'messages:room_list' %}" class="btn-view-all mt-3">{% trans "View All Chats" %}</a>
         {% else %}
-          <a href="{% url 'messages:chatroom_create' %}" class="btn-view-all mt-3">{% trans "Start a New Chat" %}</a>
+          <a href="{% url 'messages:room_create' %}" class="btn-view-all mt-3">{% trans "Start a New Chat" %}</a>
         {% endif %}
       </div>
     </div>

@@ -23,15 +23,15 @@ def home(request):
         'character_count': Character.objects.filter(user=user).count(),
         'characters': Character.objects.filter(user=user).order_by('-updated_at')[:4],
 
-        # Chat stats
+        # Chat stats - updated to use the correct field name
         'chatroom_count': ChatRoom.objects.filter(participants=user).count(),
-        'chat_rooms': ChatRoom.objects.filter(participants=user).order_by('-last_message_time')[:5],
+        'chat_rooms': ChatRoom.objects.filter(participants=user).order_by('-updated_at')[:5],
 
         # Friend stats
         'friend_count': Friendship.objects.filter(Q(user1=user) | Q(user2=user)).count(),
         'friend_requests': FriendRequest.objects.filter(to_user=user, status='pending')[:3],
 
-        # Notification stats
+        # Notification stats - updated to use 'read' field
         'notification_count': Notification.objects.filter(user=user, read=False).count(),
         'notifications': Notification.objects.filter(user=user).order_by('-created_at')[:5],
 

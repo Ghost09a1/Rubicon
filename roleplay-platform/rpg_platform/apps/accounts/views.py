@@ -43,8 +43,8 @@ class RegisterView(CreateView):
         user.set_password(form.cleaned_data['password'])
         user.save()
 
-        # Create profile for the user
-        Profile.objects.create(user=user)
+        # Profile is automatically created by the post_save signal
+        # No need to create it explicitly here
 
         messages.success(self.request, _("Your account has been created. You can now log in."))
         return super().form_valid(form)

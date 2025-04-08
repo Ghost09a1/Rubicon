@@ -66,8 +66,8 @@ class DashboardTests(TestCase):
         response = self.client.get(reverse('characters:character_list'))
         self.assertEqual(response.status_code, 200)
 
-        # Test chat rooms
-        response = self.client.get(reverse('messages:chatroom_list'))
+        # Test chat rooms - updated the URL name
+        response = self.client.get(reverse('messages:room_list'))
         self.assertEqual(response.status_code, 200)
 
         # Test friends
@@ -78,8 +78,8 @@ class DashboardTests(TestCase):
         response = self.client.get(reverse('recommendations:character_recommendations'))
         self.assertEqual(response.status_code, 200)
 
-        # Test notifications
-        response = self.client.get(reverse('notifications:list'))
+        # Test notifications - update to use notification_list
+        response = self.client.get(reverse('notifications:notification_list'))
         self.assertEqual(response.status_code, 200)
 
     def test_moderation_access(self):
