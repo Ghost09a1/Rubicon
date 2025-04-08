@@ -13,6 +13,10 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 from django import forms
+import logging
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 from rpg_platform.apps.characters.models import (
     Character, CharacterInfo, InfoField, InfoCategory,
@@ -258,9 +262,54 @@ class CharacterCreateView(LoginRequiredMixin, CreateView):
     form_class = CharacterForm
     template_name = 'characters/character_form.html'
 
+    def get_context_data(self, **kwargs):
+        try:
+            context = super().get_context_data(**kwargs)
+            context['page_title'] = _("Create New Character")
+            context['submit_text'] = _("Create Character")
+            context['max_characters'] = 10  # Consider moving to settings
+
+            # Check for character limits
+            user_character_count = Character.objects.filter(user=self.request.user).count()
+            context['character_count'] = user_character_count
+            context['can_create'] = user_character_count < context['max_characters']
+
+            return context
+        except Exception as e:
+            logger.error(f"Error in CharacterCreateView.get_context_data: {str(e)}")
+            messages.error(self.request, _("An error occurred while preparing the character creation form."))
+            return super().get_context_data(**kwargs)
+
     def form_valid(self, form):
-        form.instance.user = self.request.user
-        return super().form_valid(form)
+        try:
+            # Add user to the form instance
+            form.instance.user = self.request.user
+
+            # Check if user has reached their character limit
+            user_character_count = Character.objects.filter(user=self.request.user).count()
+            max_characters = 10  # Consider moving to settings
+
+            if user_character_count >= max_characters:
+                messages.error(self.request, _("You have reached your maximum character limit."))
+                return self.form_invalid(form)
+
+            # Save the character
+            response = super().form_valid(form)
+            messages.success(self.request, _("Character created successfully! You can now add more details, images, and preferences."))
+
+            # Log successful character creation
+            logger.info(f"User {self.request.user.username} created character ID {self.object.pk} - {self.object.name}")
+
+            return response
+        except Exception as e:
+            logger.error(f"Error in CharacterCreateView.form_valid: {str(e)}")
+            messages.error(self.request, _("An error occurred while creating your character. Please try again."))
+            return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        messages.error(self.request, _("Please correct the errors in the form."))
+        logger.warning(f"Character creation form invalid for user {self.request.user.username}. Errors: {form.errors}")
+        return super().form_invalid(form)
 
     def get_success_url(self):
         return reverse_lazy('characters:character_detail', kwargs={'pk': self.object.pk})
@@ -275,7 +324,40 @@ class CharacterUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     template_name = 'characters/character_form.html'
 
     def test_func(self):
-        return self.get_object().user == self.request.user
+        try:
+            return self.get_object().user == self.request.user
+        except Exception as e:
+            logger.error(f"Error in CharacterUpdateView.test_func: {str(e)}")
+            return False
+
+    def get_context_data(self, **kwargs):
+        try:
+            context = super().get_context_data(**kwargs)
+            context['page_title'] = _("Edit Character")
+            context['submit_text'] = _("Update Character")
+            context['is_update'] = True
+            context['character'] = self.get_object()
+            return context
+        except Exception as e:
+            logger.error(f"Error in CharacterUpdateView.get_context_data: {str(e)}")
+            messages.error(self.request, _("An error occurred while preparing the character edit form."))
+            return super().get_context_data(**kwargs)
+
+    def form_valid(self, form):
+        try:
+            response = super().form_valid(form)
+            messages.success(self.request, _("Character updated successfully!"))
+            logger.info(f"User {self.request.user.username} updated character ID {self.object.pk} - {self.object.name}")
+            return response
+        except Exception as e:
+            logger.error(f"Error in CharacterUpdateView.form_valid: {str(e)}")
+            messages.error(self.request, _("An error occurred while updating your character. Please try again."))
+            return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        messages.error(self.request, _("Please correct the errors in the form."))
+        logger.warning(f"Character update form invalid for user {self.request.user.username}, character ID {self.kwargs.get('pk')}. Errors: {form.errors}")
+        return super().form_invalid(form)
 
     def get_success_url(self):
         return reverse_lazy('characters:character_detail', kwargs={'pk': self.object.pk})

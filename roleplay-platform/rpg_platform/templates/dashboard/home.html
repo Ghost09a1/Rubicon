@@ -532,7 +532,7 @@
                 </div>
                 <div class="activity-content">
                   <p>{{ activity.get_description }}</p>
-                  <div class="activity-time">{{ activity.timestamp|timesince }} {% trans "ago" %}</div>
+                  <div class="activity-time">{{ activity.created_at|timesince }} {% trans "ago" %}</div>
                 </div>
               </div>
             {% endfor %}

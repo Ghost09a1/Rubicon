@@ -8,8 +8,12 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST, require_GET
 from django.db.models import Count, Q
 from django.utils import timezone
+import logging
 
 from .models import Notification, NotificationCategory, NotificationPreference
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 
 class NotificationCenterView(LoginRequiredMixin, TemplateView):
@@ -63,90 +67,82 @@ class NotificationListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         """Get notifications filtered by various parameters"""
-        # Base queryset - current user, not deleted
-        queryset = Notification.objects.filter(
-            user=self.request.user,
-            is_deleted=False
-        ).select_related('actor', 'category')
+        try:
+            # Base queryset - current user, not deleted
+            queryset = Notification.objects.filter(
+                user=self.request.user,
+                is_deleted=False
+            ).select_related('actor', 'category')
 
-        # Apply filters
-        category = self.request.GET.get('category')
-        notification_type = self.request.GET.get('type')
-        read = self.request.GET.get('read')
-        priority = self.request.GET.get('priority')
-        search = self.request.GET.get('search')
+            # Apply filters
+            category = self.request.GET.get('category')
+            notification_type = self.request.GET.get('type')
+            read = self.request.GET.get('read')
+            priority = self.request.GET.get('priority')
+            search = self.request.GET.get('search')
 
-        # Filter by category
-        if category:
-            try:
-                category_obj = NotificationCategory.objects.get(key=category)
-                queryset = queryset.filter(category=category_obj)
-            except NotificationCategory.DoesNotExist:
-                pass
+            # Filter by category
+            if category:
+                try:
+                    category_obj = NotificationCategory.objects.get(key=category)
+                    queryset = queryset.filter(category=category_obj)
+                except NotificationCategory.DoesNotExist:
+                    logger.warning(f"User {self.request.user.username} attempted to filter by non-existent category: {category}")
+                    messages.warning(self.request, _("The selected category does not exist."))
 
-        # Filter by notification type
-        if notification_type:
-            queryset = queryset.filter(notification_type=notification_type)
+            # Filter by notification type
+            if notification_type:
+                queryset = queryset.filter(notification_type=notification_type)
 
-        # Filter by read status
-        if read == 'read':
-            queryset = queryset.filter(read=True)
-        elif read == 'unread':
-            queryset = queryset.filter(read=False)
+            # Filter by read status
+            if read == 'read':
+                queryset = queryset.filter(read=True)
+            elif read == 'unread':
+                queryset = queryset.filter(read=False)
 
-        # Filter by priority
-        if priority:
-            queryset = queryset.filter(priority=priority)
+            # Filter by priority
+            if priority:
+                queryset = queryset.filter(priority=priority)
 
-        # Filter by search term
-        if search:
-            queryset = queryset.filter(
-                Q(verb__icontains=search) |
-                Q(description__icontains=search) |
-                Q(actor__username__icontains=search)
-            )
+            # Search in message content
+            if search:
+                queryset = queryset.filter(
+                    Q(description__icontains=search) |
+                    Q(verb__icontains=search)
+                )
 
-        # Order by created_at (newest first)
-        return queryset.order_by('-created_at')
+            return queryset.order_by('-created_at')
+        except Exception as e:
+            logger.error(f"Error in NotificationListView.get_queryset: {str(e)}")
+            messages.error(self.request, _("An error occurred while retrieving notifications. Please try again."))
+            return Notification.objects.none()
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+        """Add additional context data for the template"""
+        try:
+            context = super().get_context_data(**kwargs)
 
-        # Add filter values
-        context['category'] = self.request.GET.get('category', '')
-        context['notification_type'] = self.request.GET.get('type', '')
-        context['read_status'] = self.request.GET.get('read', '')
-        context['priority'] = self.request.GET.get('priority', '')
-        context['search'] = self.request.GET.get('search', '')
+            # Add filter values to context
+            context['current_category'] = self.request.GET.get('category', '')
+            context['current_type'] = self.request.GET.get('type', '')
+            context['current_read'] = self.request.GET.get('read', '')
+            context['current_priority'] = self.request.GET.get('priority', '')
+            context['search_query'] = self.request.GET.get('search', '')
 
-        # Add category data for filtering
-        context['categories'] = NotificationCategory.objects.all().order_by('order', 'name')
+            # Add available categories for filter dropdown
+            context['categories'] = NotificationCategory.objects.all().order_by('order', 'name')
 
-        # Add notification types for filtering
-        context['notification_types'] = dict(Notification.NOTIFICATION_TYPES)
+            # Add notification types for filter dropdown
+            context['notification_types'] = dict(Notification.NOTIFICATION_TYPES)
 
-        # Add notification priorities for filtering
-        context['notification_priorities'] = dict(Notification.PRIORITY_LEVELS)
+            # Add priority levels for filter dropdown
+            context['priority_levels'] = dict(Notification.PRIORITY_LEVELS)
 
-        # Add notification stats
-        context['total_count'] = Notification.objects.filter(
-            user=self.request.user,
-            is_deleted=False
-        ).count()
-
-        context['unread_count'] = Notification.get_unread_count(self.request.user)
-
-        context['by_type'] = Notification.objects.filter(
-            user=self.request.user,
-            is_deleted=False
-        ).values('notification_type').annotate(count=Count('notification_type'))
-
-        context['by_category'] = Notification.objects.filter(
-            user=self.request.user,
-            is_deleted=False
-        ).values('category__name').annotate(count=Count('category'))
-
-        return context
+            return context
+        except Exception as e:
+            logger.error(f"Error in NotificationListView.get_context_data: {str(e)}")
+            messages.error(self.request, _("An error occurred while preparing the notification list. Please try again."))
+            return super().get_context_data(**kwargs)
 
 
 class NotificationPreferenceView(LoginRequiredMixin, View):

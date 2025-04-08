@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 import json
+import logging
 
 from rpg_platform.apps.characters.models import Character
 
@@ -23,6 +24,9 @@ from .forms import (
     ChatRoomForm, SceneBoundaryForm, QuickResponseForm,
     SceneSettingForm, PrivateNoteForm
 )
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 # Chat Room Views
 class ChatRoomListView(LoginRequiredMixin, ListView):
@@ -52,37 +56,65 @@ class ChatRoomCreateView(LoginRequiredMixin, CreateView):
     template_name = "messages/chatroom_form.html"
 
     def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
+        try:
+            kwargs = super().get_form_kwargs()
+            kwargs['user'] = self.request.user
+            return kwargs
+        except Exception as e:
+            logger.error(f"Error in ChatRoomCreateView.get_form_kwargs: {str(e)}")
+            return super().get_form_kwargs()
 
     def form_valid(self, form):
-        # Set the creator
-        form.instance.creator = self.request.user
-        response = super().form_valid(form)
+        try:
+            # Set the creator
+            form.instance.creator = self.request.user
 
-        # Add the creator as a participant
-        self.object.participants.add(self.request.user)
+            # Check for chat room limits (optional)
+            user_room_count = ChatRoom.objects.filter(creator=self.request.user).count()
+            max_rooms = 50  # Consider moving to settings
 
-        # Add other participants if selected
-        if form.cleaned_data.get('participants'):
-            for user in form.cleaned_data['participants']:
-                self.object.participants.add(user)
+            if user_room_count >= max_rooms:
+                messages.warning(self.request, _("You have reached your maximum chat room limit."))
+                logger.warning(f"User {self.request.user.username} attempted to create a room beyond their limit")
+                return self.form_invalid(form)
 
-        # Add system message about room creation
-        ChatMessage.objects.create(
-            chat_room=self.object,
-            sender=self.request.user,
-            message=_("Chat room created"),
-            is_system_message=True
-        )
+            # Continue with creating the room
+            response = super().form_valid(form)
 
-        return response
+            # Add the creator as a participant
+            self.object.participants.add(self.request.user)
+
+            # Validate participants before adding them
+            if form.cleaned_data.get('participants'):
+                for user in form.cleaned_data['participants']:
+                    # Verify user is not blocked
+                    # You might need to implement a check against a Blocked model
+                    self.object.participants.add(user)
+
+            # Add system message about room creation
+            ChatMessage.objects.create(
+                chat_room=self.object,
+                sender=self.request.user,
+                message=_("Chat room created"),
+                is_system_message=True
+            )
+
+            messages.success(self.request, _("Chat room created successfully!"))
+            logger.info(f"User {self.request.user.username} created chat room ID {self.object.pk} - {self.object.name}")
+
+            return response
+        except Exception as e:
+            logger.error(f"Error in ChatRoomCreateView.form_valid: {str(e)}")
+            messages.error(self.request, _("An error occurred while creating the chat room. Please try again."))
+            return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        messages.error(self.request, _("Please correct the errors in the form."))
+        logger.warning(f"Chat room creation form invalid for user {self.request.user.username}. Errors: {form.errors}")
+        return super().form_invalid(form)
 
     def get_success_url(self):
         return reverse('messages:room_detail', kwargs={'pk': self.object.pk})
-
-# Existing views...
 
 class ChatRoomDetailView(LoginRequiredMixin, DetailView):
     model = ChatRoom
@@ -90,38 +122,70 @@ class ChatRoomDetailView(LoginRequiredMixin, DetailView):
     context_object_name = "room"
 
     def get_queryset(self):
+        """Ensure users can only access rooms they are participants in"""
         return ChatRoom.objects.filter(participants=self.request.user)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Add user characters for the dropdown
-        context["characters"] = Character.objects.filter(user=self.request.user)
-
-        # Get scene boundary information if it exists
+    def dispatch(self, request, *args, **kwargs):
+        """Additional security check before processing the request"""
         try:
-            context['scene_boundary'] = self.object.boundaries
-        except SceneBoundary.DoesNotExist:
-            context['scene_boundary'] = None
+            # Get the room object
+            room = self.get_object()
 
-        # Get private notes for the user in this chat room
-        context['private_notes'] = PrivateNote.objects.filter(
-            user=self.request.user,
-            chat_room=self.object
-        )
+            # Check if user is blocked from this room (if you implement room blocking)
+            # if room.is_user_blocked(request.user):
+            #     messages.error(request, _("You cannot access this chat room."))
+            #     return redirect('messages:room_list')
 
-        # Get user's quick responses
-        context['quick_responses'] = QuickResponse.objects.filter(
-            Q(user=self.request.user) &
-            (Q(character__isnull=True) | Q(character__in=context["characters"]))
-        ).order_by('-use_count')[:20]
+            # Record room visit for analytics (optional)
+            # RoomVisit.objects.create(user=request.user, room=room)
 
-        # Get all public scene settings plus user's private ones
-        context['scene_settings'] = SceneSetting.objects.filter(
-            Q(is_public=True) | Q(user=self.request.user)
-        ).order_by('-use_count')[:10]
+            return super().dispatch(request, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in ChatRoomDetailView.dispatch: {str(e)}")
+            messages.error(request, _("An error occurred while accessing the chat room."))
+            return redirect('messages:room_list')
 
-        return context
+    def get_context_data(self, **kwargs):
+        try:
+            context = super().get_context_data(**kwargs)
 
+            # Add user characters for the dropdown
+            context["characters"] = Character.objects.filter(user=self.request.user)
+
+            # Get scene boundary information if it exists
+            room = self.get_object()
+
+            try:
+                context["scene_boundary"] = SceneBoundary.objects.get(chat_room=room)
+
+                # Check if current user has agreed to boundaries
+                if context["scene_boundary"].agreed_users.filter(id=self.request.user.id).exists():
+                    context["has_agreed"] = True
+                else:
+                    context["has_agreed"] = False
+            except SceneBoundary.DoesNotExist:
+                context["scene_boundary"] = None
+
+            # Get user's quick responses
+            context["quick_responses"] = QuickResponse.objects.filter(user=self.request.user)
+
+            # Get user's private notes for this room
+            context["private_notes"] = PrivateNote.objects.filter(
+                user=self.request.user,
+                chat_room=room
+            ).order_by('-created_at')
+
+            # Get recent messages for initial display
+            context["recent_messages"] = ChatMessage.objects.filter(
+                chat_room=room
+            ).select_related('sender', 'character').order_by('-timestamp')[:50]
+
+            return context
+        except Exception as e:
+            logger.error(f"Error in ChatRoomDetailView.get_context_data: {str(e)}")
+            context = super().get_context_data(**kwargs)
+            messages.error(self.request, _("An error occurred while loading chat room data."))
+            return context
 
 class ChatRoomDeleteView(LoginRequiredMixin, DeleteView):
     """
