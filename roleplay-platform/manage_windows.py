@@ -3,6 +3,7 @@
 import os
 import sys
 import importlib.util
+import platform
 
 
 def main():
@@ -13,8 +14,20 @@ def main():
     if current_dir not in sys.path:
         sys.path.insert(0, current_dir)
 
+    # Add parent directory to path if needed
+    parent_dir = os.path.dirname(current_dir)
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+
     # Set Django's settings module
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rpg_platform.rpg_platform.settings')
+
+    # Print system information for debugging
+    print(f"Operating System: {platform.system()} {platform.release()}")
+    print(f"Python Executable: {sys.executable}")
+    print(f"Python Version: {platform.python_version()}")
+    print(f"Current Directory: {current_dir}")
+    print(f"PYTHONPATH: {sys.path[:3]}...")  # Show first few entries
 
     # Verify that Django is properly installed
     try:
