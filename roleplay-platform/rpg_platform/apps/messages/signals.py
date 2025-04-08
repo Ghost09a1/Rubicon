@@ -23,25 +23,55 @@ def create_message_notification(sender, instance, created, **kwargs):
         )
 
 
+@receiver(post_save, sender=ChatMessage)
+def update_chatroom_last_message_time(sender, instance, created, **kwargs):
+    """
+    Update the last_message_time field in the ChatRoom model when a new message is created
+    """
+    if created:
+        chat_room = instance.chat_room
+        chat_room.last_message_time = instance.created_at
+        chat_room.save(update_fields=['last_message_time'])
+
+
+@receiver(post_save, sender=ChatRoom)
+def initialize_chatroom_last_message_time(sender, instance, created, **kwargs):
+    """
+    Initialize the last_message_time field to the created_at time when a ChatRoom is created
+    """
+    if created and not instance.last_message_time:
+        instance.last_message_time = instance.created_at
+        instance.save(update_fields=['last_message_time'])
+
+
 @receiver(post_save, sender=ChatRoom)
 def log_chatroom_creation(sender, instance, created, **kwargs):
     """
     Log when a new chat room is created
     """
     if created:
-        # Get list of participants (excluding the creator)
-        participants = [user.username for user in instance.participants.all()
-                        if user != instance.creator]
+        # Get first participant as creator (since there's no explicit creator field)
+        try:
+            creator = instance.participants.first()
+            if not creator:
+                return  # No participants yet
 
-        # Log activity for the creator
-        UserActivity.log_activity(
-            user=instance.creator,
-            activity_type='message',
-            content_type='chatroom',
-            object_id=instance.id,
-            extra_data={
-                'participants': participants,
-                'room_name': instance.name or '',
-                'room_type': instance.room_type
-            }
-        )
+            # Get list of participants (excluding the creator)
+            participants = [user.username for user in instance.participants.all()
+                            if user != creator]
+
+            # Log activity for the creator
+            UserActivity.log_activity(
+                user=creator,
+                activity_type='message',
+                content_type='chatroom',
+                object_id=instance.id,
+                extra_data={
+                    'participants': participants,
+                    'room_name': instance.name or '',
+                    'room_type': instance.room_type
+                }
+            )
+        except Exception as e:
+            # Log error but don't interrupt the process
+            print(f"Error logging chat room creation: {e}")

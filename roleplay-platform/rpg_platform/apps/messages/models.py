@@ -28,6 +28,7 @@ class ChatRoom(models.Model):
     created_at = models.DateTimeField(_('Created At'), auto_now_add=True)
     updated_at = models.DateTimeField(_('Updated At'), auto_now=True)
     is_active = models.BooleanField(_('Active'), default=True)
+    last_message_time = models.DateTimeField(_('Last Message Time'), null=True, blank=True)
 
     # New fields for roleplay features
     scene_description = models.TextField(_('Scene Description'), blank=True,
