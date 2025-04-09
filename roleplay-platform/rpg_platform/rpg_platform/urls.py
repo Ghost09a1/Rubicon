@@ -10,7 +10,7 @@ from rpg_platform.apps.messages.views import ChatMessageCreateView  # ✅
 app_name = 'messages'
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin/', admin.site.urls), 
     path('create/', ChatMessageCreateView.as_view(), name='chatmessage_create'),
 
     # Include dashboard app
