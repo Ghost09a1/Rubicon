@@ -1,49 +1,39 @@
-from django.urls import path
-from .views import (
-    ChatRoomListView, ChatRoomCreateView, ChatRoomDetailView, ChatRoomDeleteView,
-    SceneBoundaryView, SceneBoundaryAgreementView,
-    SceneSettingListView, SceneSettingCreateView, SceneSettingUpdateView, SceneSettingDeleteView,
-    QuickResponseListView, QuickResponseCreateView, QuickResponseUpdateView, QuickResponseDeleteView,
-    PrivateNoteListView, PrivateNoteCreateView, PrivateNoteUpdateView, PrivateNoteDeleteView,
-    apply_scene_setting, update_scene_status, use_quick_response,
-    chat_messages_api, send_message_api, mark_message_read_api, user_characters_api
-)
+from django.contrib import admin
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
+from django.views.generic import RedirectView
+from django.contrib.auth.decorators import login_required
+from rpg_platform.apps.messages.views import ChatMessageCreateView  # ✅
+
 
 app_name = 'messages'
 
 urlpatterns = [
-    path('', ChatRoomListView.as_view(), name='room_list'),
-    path('create/', ChatRoomCreateView.as_view(), name='room_create'),
-    path('<int:pk>/', ChatRoomDetailView.as_view(), name='room_detail'),
-    path('<int:pk>/delete/', ChatRoomDeleteView.as_view(), name='room_delete'),
+    path('admin/', admin.site.urls),
+    path('create/', ChatMessageCreateView.as_view(), name='chatmessage_create'),
 
-    path('<int:room_id>/boundaries/', SceneBoundaryView.as_view(), name='scene_boundary'),
-    path('<int:room_id>/boundaries/agree/', SceneBoundaryAgreementView.as_view(), name='scene_boundary_agree'),
+    # Include dashboard app
+    path('dashboard/', include('rpg_platform.apps.dashboard.urls')),
 
-    path('scene-settings/', SceneSettingListView.as_view(), name='scene_setting_list'),
-    path('scene-settings/create/', SceneSettingCreateView.as_view(), name='scene_setting_create'),
-    path('scene-settings/<int:pk>/edit/', SceneSettingUpdateView.as_view(), name='scene_setting_update'),
-    path('scene-settings/<int:pk>/delete/', SceneSettingDeleteView.as_view(), name='scene_setting_delete'),
+    # Account management
+    path('accounts/', include('rpg_platform.apps.accounts.urls')),
 
-    path('quick-responses/', QuickResponseListView.as_view(), name='quick_response_list'),
-    path('quick-responses/create/', QuickResponseCreateView.as_view(), name='quick_response_create'),
-    path('quick-responses/<int:pk>/edit/', QuickResponseUpdateView.as_view(), name='quick_response_update'),
-    path('quick-responses/<int:pk>/delete/', QuickResponseDeleteView.as_view(), name='quick_response_delete'),
+    # Feature-specific URLs
+    path('characters/', include('rpg_platform.apps.characters.urls')),
+    path('messages/', include('rpg_platform.apps.messages.urls')),
+    path('notifications/', include('rpg_platform.apps.notifications.urls')),
+    path('moderation/', include('rpg_platform.apps.moderation.urls')),
+    path('recommendations/', include('rpg_platform.apps.recommendations.urls')),
 
-    path('private-notes/', PrivateNoteListView.as_view(), name='private_note_list'),
-    path('private-notes/create/', PrivateNoteCreateView.as_view(), name='private_note_create'),
-    path('private-notes/<int:pk>/edit/', PrivateNoteUpdateView.as_view(), name='private_note_update'),
-    path('private-notes/<int:pk>/delete/', PrivateNoteDeleteView.as_view(), name='private_note_delete'),
-    path('private-notes/room/<int:room_id>/', PrivateNoteListView.as_view(), name='private_note_list_room'),
-    path('private-notes/room/<int:room_id>/create/', PrivateNoteCreateView.as_view(), name='private_note_create_room'),
+    # Redirect authenticated users to dashboard, anonymous users to landing
+    path('', RedirectView.as_view(url='/dashboard/'), name='home'),
 
-    # AJAX / API
-    path('<int:room_id>/apply-scene/<int:setting_id>/', apply_scene_setting, name='apply_scene_setting'),
-    path('<int:room_id>/update-status/', update_scene_status, name='update_scene_status'),
-    path('quick-response/<int:response_id>/', use_quick_response, name='use_quick_response'),
-
-    path('api/<int:room_id>/messages/', chat_messages_api, name='chat_messages_api'),
-    path('api/<int:room_id>/send/', send_message_api, name='send_message_api'),
-    path('api/message/<int:message_id>/read/', mark_message_read_api, name='mark_message_read_api'),
-    path('api/user-characters/', user_characters_api, name='user_characters_api'),
+    # Landing page for anonymous users
+    path('landing/', include('rpg_platform.apps.landing.urls')),
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
